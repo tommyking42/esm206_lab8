@@ -1,0 +1,131 @@
+---
+title: "ESM 206 Lab 8"
+author: "Tommy King"
+date: "11/16/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+library(tidyverse)
+library(modelsummary)
+library(corrplot) 
+library(broom)
+library(here)
+library(janitor)
+```
+
+```{r}
+homes <- read_csv(here("slo_homes.csv")) %>% 
+  clean_names()
+```
+
+### Create a subset  (called homes_subset) that only contains observations where the city is: 
+- San Luis Obispo
+- Atascadero
+- Arroyo Grande
+- Santa Maria- Orcutt
+
+```{r}
+homes_subset <- homes %>% 
+  filter(city %in% c("San Luis Obispo", "Atascadero", "Arroyo Grande", "Santa Maria-Orcutt"))
+```
+
+### A little exploration
+
+Task: create a summary table that has the mean and standard deviation of home prices grouped by city and sale status
+
+```{r}
+homes_table <- homes_subset %>% 
+  group_by(city, status) %>% 
+  
+  summarize(mean_price = mean(price), 
+         sd_price = sd(price)) 
+
+homes_table
+```
+ 
+ Task: Explore the relationship between square footage and home price. 
+```{r}
+ggplot(data = homes_subset, aes(x = sq_ft, y = price)) +
+  geom_point(aes(color=city)) + 
+  facet_wrap(~ city) +
+  geom_smooth(method = "lm")
+```
+
+### Try a few linear models
+
+Use multiple linear regression to investigate relationships between several predictor variables and home price. 
+
+Create 2 different permutations of this model. 
+1. Price ~ city, bedrooms, bathrooms, sq_ft, status (lm1)
+2. Price ~ city, sq_ft, status (lm2)
+3. Try another one. (lm3)
+
+```{r}
+lm1 <- lm(price ~ city + bedrooms + bathrooms + sq_ft + status, data = homes_subset) 
+
+tidy(lm1)
+glance(lm1)
+
+lm2 <- lm(price ~ city + sq_ft + status, data = homes_subset)
+
+tidy(lm2)
+glance(lm2)
+
+# If i wanted San Luis Obispo to be the reference level: 
+# Use fct_relevel() to specify a new reference level
+
+#new_homes_subset <- homes_subset %>% 
+#  mutate(city = fct_relevel(city, "San Luis Obispo"))
+
+
+
+```
+
+### Explore correlations betwwen quanitative variables 
+
+Task: Make a subset called homes_quant (starting from homes_subset) that only contains the variables from Price through sq_ft. 
+
+```{r}
+homes_quant <- homes_subset %>% 
+  select(price: sq_ft)
+
+# use cor() function to view colinearity between the variables.
+homes_cor <- cor(homes_quant)
+# use corrplot() to visualize collinearity.
+corrplot(homes_cor)
+```
+
+
+### COmpare AIC Values 
+```{r}
+AIC(lm1)
+AIC(lm2)
+# Smaller AIC value is better. 
+# in literature, include all models so that readers can interpret on their own.
+```
+### Use modelsummary() to return multiple model outputs
+```{r}
+modelsummary(list(lm1, lm2))
+# gives us information to compare different models directly.
+```
+
+### Check out the diganostic plots for lm1
+```{r}
+plot(lm1)
+```
+### Use broom::augment() to return the predictions for existing observations
+```{r}
+home_predictions <- augment(lm1)
+
+# Make a histogram of the residuals from this model (lm1)
+
+ggplot(data = home_predictions, aes(x = .resid)) + 
+  geom_histogram()
+# look for normal distribution of residuals.
+
+```
+
+
